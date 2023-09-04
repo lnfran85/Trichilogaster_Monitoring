@@ -20,7 +20,15 @@ db <- read.xlsx(".\\GallsTrichi_Volunteer_20230824.xlsx", "GallsTrichi_Volunteer
   #Filtering only Epicollect 5 records during the Monitoring campaign
   filter(Atividade == "Monitorizacao",
          Source == "Epicollect 5",
-         between(Date, as.Date('2023-07-01'), as.Date('2023-08-24'))) %>% 
+         between(Date, as.Date('2023-06-01'), as.Date('2023-08-24'))) %>%
+  droplevels() %>%
+  #Excluding people not involved on monitoring campaign
+  filter(User != "António Correia ",
+         User != "Dora Oliveira (ICNF)",
+         User != "Mário Reis",
+         User != "Catarina Gregorio (ICNF)",
+         User != "Isa Teixeira (ICNF)") %>%
+  droplevels() %>%
   #Transforming variables to factor, and latitude and longitude to numeric
   mutate_at(c(5,13:17,19,20:23), as.factor) %>%
   mutate_at(c("Y", "X"), as.numeric) %>%
@@ -41,6 +49,7 @@ db <- read.xlsx(".\\GallsTrichi_Volunteer_20230824.xlsx", "GallsTrichi_Volunteer
          Perc_phylo = fct_recode(X.Cob_Phyllodes, "0"="0%","5.5"="1%-10%","17.5"="10%-25%","37.5"="25%-50%","62.5"="50%-75%","82.5"="75%-90%","105"="﹥90%" ),
          Perc_flow = fct_recode(X.Cob_Flowers, "0"="0%","5.5"="1%-10%","17.5"="10%-25%","37.5"="25%-50%","62.5"="50%-75%","82.5"="75%-90%","105"="﹥90%" ),
          Perc_pods = fct_recode(X.Cob_Pods, "0"="0%","5.5"="1%-10%","17.5"="10%-25%","37.5"="25%-50%","62.5"="50%-75%","82.5"="75%-90%","105"="﹥90%" )) %>% 
+  droplevels() %>%
   #Transforming qualitative new variables to numeric       
   mutate_at(c("Perc_galls", "Perc_phylo", "Perc_flow", "Perc_pods"), as.numeric) %>% 
   #Transforming data frame to spatial data frame and projecting from WGS84 to ETRS89 / Portugal TM06
@@ -57,24 +66,34 @@ save(db,grid_pt, file = "dataset_monitoring_2023.rds")
 #CREATING MAPS ----
 
 #PRESENCE OF TRICHILOGASTER
-with_galls <- db %>% 
-  filter(X8_A_planta_que_est_a == "Sim") #Filtering points with presence only of Trichilogaster
-
-with_galls_grids <- grid_pt[with_galls,] #Filtering cells with presence only of Trichilogaster
-
-plot(st_geometry(grid_pt[pi, ])) #Plotting on subsetted map to doublecheck
-
-st_write(with_galls_grids, dsn = paste0(out.dir, "with_galls",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+#Filtering points with presence only of Trichilogaster
+with_galls <- db %>%
+  filter(Species == "Acacia longifolia",
+         Presence == "Sim") 
+with_galls$Species <- droplevels(with_galls$Species) 
+with_galls$Presence <- droplevels(with_galls$Presence)
+#Filtering cells with presence only of Trichilogaster
+with_galls_grids <- grid_pt[with_galls,] 
+#Plotting on subsetted map to double check
+plot(st_geometry(grid_pt[with_galls, ])) 
+#Exporting to shapefile
+st_write(with_galls_grids, dsn = paste0(out.dir, "with_galls_",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
 #ABSENCE OF TRICHILOGASTER
+#Filtering points without presence of Trichilogaster
 without_galls <- db %>% 
-  filter(X8_A_planta_que_est_a == "Não") #Filtering points without presence of Trichilogaster
+  filter(Species == "Acacia longifolia",
+         Presence == "Não") 
+without_galls$Species <- droplevels(without_galls$Species) 
+without_galls$Presence <- droplevels(without_galls$Presence)
+#Filtering cells without presence of Trichilogaster
+without_galls_grids<- grid_pt[without_galls,] 
+#Plotting on subsetted map to double check
+plot(st_geometry(grid_pt[without_galls, ])) 
+#Exporting to shapefile
+st_write(without_galls_grids, dsn=paste0(out.dir, "without_galls_",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
-without_galls_grids<- grid_pt[without_galls,] #Filtering cells without presence of Trichilogaster
 
-plot(st_geometry(grid_pt[without_galls, ])) #Plotting on subsetted map to doublecheck
-
-st_write(without_galls_grids, dsn=paste0(out.dir, "without_galls",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
 
 with_galls_m <- with_galls %>% 
