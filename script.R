@@ -11,9 +11,10 @@ library(htmlwidgets)
 out.dir <- (".\\Monit_Trichi_2023\\Mapas\\")
 
 #LOADING DATASETS ----
-
+  #load("datasets_monitoring_2023.rds")
 #Loading grid UTM 10x10km ETRS89 / Portugal TM06
-grid_pt <- st_read(".\\Monit_Trichi_2023\\Monit_Trichilogaster_2023\\Fishnet_10km.shp")
+grid_pt <- st_read(".\\Monit_Trichi_2023\\Monit_Trichilogaster_2023\\Fishnet_10km.shp") #the whole grid
+grid_pt30 <- st_read(".\\Monit_Trichi_2023\\Monit_Trichilogaster_2023\\Fishnet_10km_clip.shp") #the clipped grid with 30km from the coastline
 
 #Loading monitored points
 db <- read.xlsx(".\\GallsTrichi_Volunteer_20230824.xlsx", "GallsTrichi_Volunteer", header = T, encoding ="UTF-8") %>% 
@@ -134,6 +135,16 @@ plot(st_geometry(grid_pt[db2, ]))
 #Exporting to shapefile
 st_write(Pl_not_visited_grids, dsn = paste0(out.dir, "Places_WithoutVis",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
+#Filtering and counting the number of cells sampled in the first 30km from the coastline
+overlaped <- intersect(with_galls_grids,without_galls_grids) #solapadas
+only_pres <- setdiff(with_galls_grids,without_galls_grids) #solo pres
+only_abs <- setdiff(without_galls_grids,with_galls_grids) #solo aus
+
+with_trichi <- rbind(overlaped, only_pres)
+without_trichi <- only_abs
+
+with_trichi_grids30<- grid_pt30[with_trichi,] 
+plot(st_geometry(grid_pt30[with_trichi,] ))
 
 #Plotting map (simple)
 ggplot() + 
@@ -164,7 +175,7 @@ ggplot() +
       text_family = "ArcherPro Book") )
 
 
-#Creating the more complex and apelative map
+##Creating the more complex and apelative map ----
 #Transforming overlaped cells (pres and absence) in presences
 overlaped <- intersect(with_galls_grids,without_galls_grids) #solapadas
 only_pres <- setdiff(with_galls_grids,without_galls_grids) #solo pres
@@ -215,7 +226,135 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
     baseGroups = c("Open Street Map", "Satellite"),
     #overlayGroups = c("marcadores", "clusteres", "Freguesias com Presença", "Freguesias com Libertação"),
     #overlayGroups = c("Censo", "Áreas Protegidas"),
-    overlayGroups = c("Grelha UTM10x10km"),
+    overlayGroups = c("Grelha UTM10x10km", "Galhas detectadas", "Galhas não detectadas", "Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas"),
+    options = layersControlOptions(collapsed = FALSE)) %>% 
+
+  addEasyButton(easyButton(
+    icon="fa-globe", title="Zoom to Level 10",
+    onClick=JS("function(btn, map){ map.setZoom(10); }"))) %>%
+  addEasyButton(easyButton(
+    icon="fa-crosshairs", title="Locate Me",
+    onClick=JS("function(btn, map){ map.locate({setView: true}); }"))) %>% 
+  
+  addMeasure(primaryLengthUnit = "kilometers",
+             primaryAreaUnit = "hectares",
+             localization = "pt_PT")
+#Printing and exporting the map
+m  
+saveWidget(m, file = ".\\Monit_Trichi_2023\\Mapas\\mapa_pres_aus_leaflet.html")
+
+
+#CALCULATING MEANS ----
+#Filtering points with presence only of Trichilogaster
+with_galls_m <- db %>%
+  filter(Species == "Acacia longifolia",
+         Presence == "Sim") 
+with_galls_m$Species <- droplevels(with_galls_m$Species) 
+with_galls_m$Presence <- droplevels(with_galls_m$Presence)
+with_galls_m <- with_galls_m %>% 
+  select(Perc_galls, Perc_phylo, Perc_flow, Perc_pods, ID_grid, geometry) %>%
+  group_by(ID_grid) %>% 
+  summarise(perc_galls_mean = mean(Perc_galls),
+         perc_phylo_mean = mean(Perc_phylo),
+         perc_flow_mean = mean(Perc_flow),
+         perc_pods_mean = mean(Perc_pods))
+
+#Filtering cells with presence only of Trichilogaster
+with_galls_m_grids <- grid_pt[with_galls_m,] 
+#Plotting on subsetted map to double check
+plot(st_geometry(grid_pt[with_galls, ])) 
+#Exporting to shapefile
+st_write(with_galls_grids, dsn = paste0(out.dir, "with_galls",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+
+
+
+#Creating the map
+#Creating the map
+conpal_galls <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_galls_mean, na.color = "gray")
+conpal_phylo <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_phylo_mean, na.color = "gray")
+conpal_flow <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_flow_mean, na.color = "gray")
+conpal_pods <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_pods_mean, na.color = "gray")
+
+
+labels_ <- sprintf(
+  "<strong>%s</strong><br/>",
+  with_galls_m$perc_galls_mean, with_galls_m$perc_phylo_mean
+) %>% lapply(htmltools::HTML)
+
+
+m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas = TRUE) ) %>%
+  addProviderTiles("OpenStreetMap", group="Open Street Map") %>% 
+  addProviderTiles("Esri.WorldImagery", group="Satellite") %>%
+  setView(-7.121931, 39.909736, zoom = 6) %>%
+  addPolygons(data = grid_pt1, 
+              color = "white", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
+              group = "Grelha UTM10x10km") %>%
+  addPolygons(data = Pl_wTrichi_grids1, 
+              color = "orange", fillColor = "orange", fillOpacity = 0.4,dashArray = "3",
+              group = "Quadrículas com Trichilogaster não visitadas") %>% 
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~conpal_galls(with_galls_m$perc_galls_mean), fillColor = ~conpal_galls(with_galls_m$perc_galls_mean), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "% Cobertura galhas: ", with_galls_m$perc_galls_mean, "<br>"),
+              fillOpacity = 0.9,dashArray = "3",
+              group = "% Cobertura galhas") %>%  
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~conpal_phylo(with_galls_m$perc_phylo_mean), fillColor = ~conpal_phylo(with_galls_m$perc_phylo_mean),
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "% Cobertura filódios: ", with_galls_m$perc_phylo_mean, "<br>"),
+              fillOpacity = 0.9,dashArray = "3",
+              group = "% Cobertura filódios") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~conpal_flow(with_galls_m$perc_flow_mean), fillColor = ~conpal_flow(with_galls_m$perc_flow_mean), fillOpacity = 0.9,dashArray = "3",
+              highlightOptions = highlightOptions(
+                weight = 5,
+                color = ~conpal_flow(with_galls_m$perc_flow_mean),
+                fillColor = ~conpal_flow(with_galls_m$perc_flow_mean),
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              label = labels_,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"),
+              group = "% Cobertura flores") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~conpal_pods(with_galls_m$perc_pods_mean), fillColor = ~conpal_pods(with_galls_m$perc_pods_mean), fillOpacity = 0.9,dashArray = "3",
+              highlightOptions = highlightOptions(
+                weight = 5,
+                color = ~conpal_pods(with_galls_m$perc_pods_mean),
+                fillColor = ~conpal_pods(with_galls_m$perc_pods_mean),
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              label = labels_,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"),
+              group = "% Cobertura vagens") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = "green", fillColor = "green", fillOpacity = 0.4,dashArray = "3",
+              highlightOptions = highlightOptions(
+                weight = 5,
+                color = "green",
+                fillColor = "green",
+                dashArray = "",
+                fillOpacity = 0.7,
+                bringToFront = TRUE),
+              label = labels_,
+              labelOptions = labelOptions(
+                style = list("font-weight" = "normal", padding = "3px 8px"),
+                textsize = "15px",
+                direction = "auto"),
+              group = "Galhas detectadas") %>%
+  
+  addLayersControl(
+    baseGroups = c("Open Street Map", "Satellite"),
+    #overlayGroups = c("marcadores", "clusteres", "Freguesias com Presença", "Freguesias com Libertação"),
+    #overlayGroups = c("Censo", "Áreas Protegidas"),
+    overlayGroups = c("Grelha UTM10x10km", "Galhas detectadas", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens"),
     options = layersControlOptions(collapsed = FALSE)) %>% 
   
   addEasyButton(easyButton(
@@ -230,14 +369,5 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
              localization = "pt_PT")
 #Printing and exporting the map
 m  
-saveWidget(m, file = ".//mapa_leaflet.html")
+saveWidget(m, file = ".\\Monit_Trichi_2023\\Mapas\\mapa_pres_aus_leaflet.html")
 
-
-
-
-
-
-with_galls_m <- with_galls %>% 
-  select(Perc_galls, Perc_phylo, Perc_flow, Perc_pods, ID_grid) %>% 
-  group_by(ID_grid) %>% 
-  mutate(perc_galls_mean = mean(Perc_galls))
