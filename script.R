@@ -53,7 +53,8 @@ db <- read.xlsx(".\\GallsTrichi_Volunteer_20230824.xlsx", "GallsTrichi_Volunteer
          Perc_flow = fct_recode(X.Cob_Flowers, "0"="0%","5.5"="1%-10%","17.5"="10%-25%","37.5"="25%-50%","62.5"="50%-75%","82.5"="75%-90%","105"="﹥90%" ),
          Perc_pods = fct_recode(X.Cob_Pods, "0"="0%","5.5"="1%-10%","17.5"="10%-25%","37.5"="25%-50%","62.5"="50%-75%","82.5"="75%-90%","105"="﹥90%" )) %>% 
   droplevels() %>%
-  #Transforming qualitative new variables to numeric       
+  #Transforming qualitative new variables to numeric
+  mutate_at(c("Perc_galls", "Perc_phylo", "Perc_flow", "Perc_pods"), as.character) %>% 
   mutate_at(c("Perc_galls", "Perc_phylo", "Perc_flow", "Perc_pods"), as.numeric) %>% 
   #Transforming data frame to spatial data frame and projecting from WGS84 to ETRS89 / Portugal TM06
   filter(!is.na(X)) %>%
@@ -135,6 +136,8 @@ plot(st_geometry(grid_pt[db2, ]))
 #Exporting to shapefile
 st_write(Pl_not_visited_grids, dsn = paste0(out.dir, "Places_WithoutVis",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
+###################
+###################
 #Filtering and counting the number of cells sampled in the first 30km from the coastline
 overlaped <- intersect(with_galls_grids,without_galls_grids) #solapadas
 only_pres <- setdiff(with_galls_grids,without_galls_grids) #solo pres
@@ -145,6 +148,8 @@ without_trichi <- only_abs
 
 with_trichi_grids30<- grid_pt30[with_trichi,] 
 plot(st_geometry(grid_pt30[with_trichi,] ))
+###################
+###################
 
 #Plotting map (simple)
 ggplot() + 
@@ -252,34 +257,63 @@ with_galls_m <- db %>%
 with_galls_m$Species <- droplevels(with_galls_m$Species) 
 with_galls_m$Presence <- droplevels(with_galls_m$Presence)
 with_galls_m <- with_galls_m %>% 
-  select(Perc_galls, Perc_phylo, Perc_flow, Perc_pods, ID_grid, geometry) %>%
+  select(Perc_galls, Perc_phylo, Perc_flow, Perc_pods, ID_grid, geometry, X, Y) %>%
   group_by(ID_grid) %>% 
-  summarise(perc_galls_mean = mean(Perc_galls),
-         perc_phylo_mean = mean(Perc_phylo),
-         perc_flow_mean = mean(Perc_flow),
-         perc_pods_mean = mean(Perc_pods))
+  summarise(
+    perc_galls_sample.size = n(),
+    perc_galls_mean = mean(Perc_galls),
+    sd.perc_galls=sd(Perc_galls),
+    error.perc_galls=sd.perc_galls/sqrt(perc_galls_sample.size), 
+    perc_phylo_sample.size = n(),
+    perc_phylo_mean = mean(Perc_phylo),
+    sd.perc_phylo=sd(Perc_phylo),
+    error.perc_phylo=sd.perc_phylo/sqrt(perc_phylo_sample.size),
+    perc_flow_sample.size = n(),
+    perc_flow_mean = mean(Perc_flow),
+    sd.perc_flow=sd(Perc_flow),
+    error.perc_flow=sd.perc_flow/sqrt(perc_flow_sample.size),
+    perc_pods_sample.size = n(),
+    perc_pods_mean = mean(Perc_pods),
+    sd.perc_pods=sd(Perc_pods),
+    error.perc_pods=sd.perc_pods/sqrt(perc_pods_sample.size)) %>% 
+  mutate(Perc_galls_cat=cut(perc_galls_mean, breaks=c(-Inf, 0, 25, 75, Inf)),
+         Perc_phylo_cat=cut(perc_phylo_mean, breaks=c(-Inf, 0, 25, 75, Inf)),
+         Perc_flow_cat=cut(perc_flow_mean, breaks=c(-Inf, 0, 25, 75, Inf)),
+         Perc_pods_cat=cut(perc_pods_mean, breaks=c(-Inf, 0, 25, 75, Inf)))
+
+
+#saving table
+write.csv2(as.data.frame(with_galls_m), 'Tabela_medias_monitor_Trichi_2023.csv')
+
+#Creating the map
 
 #Filtering cells with presence only of Trichilogaster
 with_galls_m_grids <- grid_pt[with_galls_m,] 
 #Plotting on subsetted map to double check
 plot(st_geometry(grid_pt[with_galls, ])) 
-#Exporting to shapefile
-st_write(with_galls_grids, dsn = paste0(out.dir, "with_galls",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
+with_galls_m_grids1 <- with_galls_m_grids %>%
+  st_transform(crs = 4326)
 
+without_galls_grids1 <- without_galls_grids %>%
+  st_transform(crs = 4326)
 
-#Creating the map
-#Creating the map
+Pl_not_visited_grids1 <- Pl_not_visited_grids %>%
+  st_transform(crs = 4326)
+
+Pl_wTrichi_grids1 <- Pl_wTrichi_grids %>%
+  st_transform(crs = 4326)
+
 conpal_galls <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_galls_mean, na.color = "gray")
 conpal_phylo <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_phylo_mean, na.color = "gray")
 conpal_flow <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_flow_mean, na.color = "gray")
 conpal_pods <- colorNumeric(palette = "Greens", domain = with_galls_m$perc_pods_mean, na.color = "gray")
 
+dispal_galls <- colorFactor(c("white", "yellow","palegreen","darkgreen" ), domain = with_galls_m$Perc_galls_cat, na.color = "black")
+dispal_phylo <- colorFactor(c("white", "yellow","palegreen","darkgreen" ), domain = with_galls_m$Perc_phylo_cat, na.color = "black")
+dispal_flow <- colorFactor(c("white", "yellow","palegreen","darkgreen" ), domain = with_galls_m$Perc_flow_cat, na.color = "black")
+dispal_pods <- colorFactor(c("white", "yellow","orange","darkred" ), domain = with_galls_m$Perc_pods_cat, na.color = "black")
 
-labels_ <- sprintf(
-  "<strong>%s</strong><br/>",
-  with_galls_m$perc_galls_mean, with_galls_m$perc_phylo_mean
-) %>% lapply(htmltools::HTML)
 
 
 m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas = TRUE) ) %>%
@@ -289,73 +323,108 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
   addPolygons(data = grid_pt1, 
               color = "white", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
               group = "Grelha UTM10x10km") %>%
+  addPolygons(data = without_galls_grids1, 
+              color = "red", fillColor = "red", fillOpacity = 0.4,dashArray = "3",
+              group = "Galhas não detectadas") %>%
   addPolygons(data = Pl_wTrichi_grids1, 
               color = "orange", fillColor = "orange", fillOpacity = 0.4,dashArray = "3",
               group = "Quadrículas com Trichilogaster não visitadas") %>% 
+  addPolygons(data = Pl_not_visited_grids1, 
+              color = "black", fillColor = "black", fillOpacity = 0.4,dashArray = "3",
+              group = "Quadrículas com acácia não visitadas") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~dispal_galls(with_galls_m$Perc_galls_cat), fillColor = ~dispal_galls(with_galls_m$Perc_galls_cat), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "Número de acácias avaliadas: ", with_galls_m$perc_galls_sample.size, "<br>", 
+                            "% Cobertura galhas: ", with_galls_m$perc_galls_mean, "\u00b1", round(with_galls_m$error.perc_galls, 1), "SME","<br>"),
+              fillOpacity = 0.9,dashArray = "3",
+              group = "Classe % Cobertura galhas") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~dispal_phylo(with_galls_m$Perc_phylo_cat), fillColor = ~dispal_phylo(with_galls_m$Perc_phylo_cat), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "Número de acácias avaliadas: ", with_galls_m$perc_phylo_sample.size, "<br>", 
+                            "% Cobertura filódios: ", with_galls_m$perc_phylo_mean, "\u00b1", round(with_galls_m$error.perc_phylo, 1), "SME","<br>"),
+              fillOpacity = 0.9,dashArray = "3",
+              group = "Classe % Cobertura filódios") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~dispal_flow(with_galls_m$Perc_flow_cat), fillColor = ~dispal_flow(with_galls_m$Perc_flow_cat), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "Número de acácias avaliadas: ", with_galls_m$perc_flow_sample.size, "<br>", 
+                            "% Cobertura flores: ", with_galls_m$perc_flow_mean, "\u00b1", round(with_galls_m$error.perc_flow, 1), "SME","<br>"),
+              fillOpacity = 0.9,dashArray = "3",
+              group = "Classe % Cobertura flores") %>%
+  addPolygons(data = with_galls_m_grids1, 
+              color = ~dispal_pods(with_galls_m$Perc_pods_cat), fillColor = ~dispal_pods(with_galls_m$Perc_pods_cat), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "Número de acácias avaliadas: ", with_galls_m$perc_pods_sample.size, "<br>", 
+                            "% Cobertura vagens: ", with_galls_m$perc_pods_mean, "\u00b1", round(with_galls_m$error.perc_pods, 1), "SME","<br>"),
+              fillOpacity = 0.9,dashArray = "3",
+              group = "Classe % Cobertura vagens") %>%
+  
   addPolygons(data = with_galls_m_grids1, 
               color = ~conpal_galls(with_galls_m$perc_galls_mean), fillColor = ~conpal_galls(with_galls_m$perc_galls_mean), 
               popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
-                            "% Cobertura galhas: ", with_galls_m$perc_galls_mean, "<br>"),
+                            "Número de acácias avaliadas: ", with_galls_m$perc_galls_sample.size, "<br>", 
+                            "% Cobertura galhas: ", with_galls_m$perc_galls_mean, "\u00b1", round(with_galls_m$error.perc_galls, 1), "SME","<br>"),
               fillOpacity = 0.9,dashArray = "3",
               group = "% Cobertura galhas") %>%  
   addPolygons(data = with_galls_m_grids1, 
               color = ~conpal_phylo(with_galls_m$perc_phylo_mean), fillColor = ~conpal_phylo(with_galls_m$perc_phylo_mean),
               popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
-                            "% Cobertura filódios: ", with_galls_m$perc_phylo_mean, "<br>"),
+                            "Número de acácias avaliadas: ", with_galls_m$perc_phylo_sample.size, "<br>",
+                            "% Cobertura filódios: ", with_galls_m$perc_phylo_mean, "\u00b1", round(with_galls_m$error.perc_phylo, 1), "SME", "<br>"),
               fillOpacity = 0.9,dashArray = "3",
               group = "% Cobertura filódios") %>%
   addPolygons(data = with_galls_m_grids1, 
-              color = ~conpal_flow(with_galls_m$perc_flow_mean), fillColor = ~conpal_flow(with_galls_m$perc_flow_mean), fillOpacity = 0.9,dashArray = "3",
-              highlightOptions = highlightOptions(
-                weight = 5,
-                color = ~conpal_flow(with_galls_m$perc_flow_mean),
-                fillColor = ~conpal_flow(with_galls_m$perc_flow_mean),
-                dashArray = "",
-                fillOpacity = 0.7,
-                bringToFront = TRUE),
-              label = labels_,
-              labelOptions = labelOptions(
-                style = list("font-weight" = "normal", padding = "3px 8px"),
-                textsize = "15px",
-                direction = "auto"),
+              color = ~conpal_flow(with_galls_m$perc_flow_mean), fillColor = ~conpal_flow(with_galls_m$perc_flow_mean), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "Número de acácias avaliadas: ", with_galls_m$perc_flow_sample.size, "<br>",
+                            "% Cobertura flores: ", with_galls_m$perc_flow_mean, "\u00b1", round(with_galls_m$error.perc_flow, 1), "SME", "<br>"),
+              fillOpacity = 0.9,dashArray = "3",
               group = "% Cobertura flores") %>%
   addPolygons(data = with_galls_m_grids1, 
-              color = ~conpal_pods(with_galls_m$perc_pods_mean), fillColor = ~conpal_pods(with_galls_m$perc_pods_mean), fillOpacity = 0.9,dashArray = "3",
-              highlightOptions = highlightOptions(
-                weight = 5,
-                color = ~conpal_pods(with_galls_m$perc_pods_mean),
-                fillColor = ~conpal_pods(with_galls_m$perc_pods_mean),
-                dashArray = "",
-                fillOpacity = 0.7,
-                bringToFront = TRUE),
-              label = labels_,
-              labelOptions = labelOptions(
-                style = list("font-weight" = "normal", padding = "3px 8px"),
-                textsize = "15px",
-                direction = "auto"),
+              color = ~conpal_pods(with_galls_m$perc_pods_mean), fillColor = ~conpal_pods(with_galls_m$perc_pods_mean), 
+              popup = paste("Quadrícula: ", with_galls_m_grids1$ID_grid, "<br>",
+                            "Número de acácias avaliadas: ", with_galls_m$perc_pods_sample.size, "<br>",
+                            "% Cobertura vagens: ", with_galls_m$perc_pods_mean, "\u00b1", round(with_galls_m$error.perc_pods, 1), "SME", "<br>"),
+              fillOpacity = 0.9,dashArray = "3",
               group = "% Cobertura vagens") %>%
   addPolygons(data = with_galls_m_grids1, 
               color = "green", fillColor = "green", fillOpacity = 0.4,dashArray = "3",
-              highlightOptions = highlightOptions(
-                weight = 5,
-                color = "green",
-                fillColor = "green",
-                dashArray = "",
-                fillOpacity = 0.7,
-                bringToFront = TRUE),
-              label = labels_,
-              labelOptions = labelOptions(
-                style = list("font-weight" = "normal", padding = "3px 8px"),
-                textsize = "15px",
-                direction = "auto"),
               group = "Galhas detectadas") %>%
   
   addLayersControl(
     baseGroups = c("Open Street Map", "Satellite"),
     #overlayGroups = c("marcadores", "clusteres", "Freguesias com Presença", "Freguesias com Libertação"),
     #overlayGroups = c("Censo", "Áreas Protegidas"),
-    overlayGroups = c("Grelha UTM10x10km", "Galhas detectadas", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens"),
+    overlayGroups = c("Grelha UTM10x10km", "Galhas detectadas", "Galhas não detectadas","Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura galhas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens"),
     options = layersControlOptions(collapsed = FALSE)) %>% 
+  
+  addLegend(position = "bottomleft", pal = conpal_galls, values = with_galls_m$perc_galls_mean,
+            title = "% Cobertura de galhas",
+            opacity = 0.3, group="% Cobertura galhas") %>% 
+  addLegend(position = "bottomleft", pal = conpal_phylo, values = with_galls_m$perc_phylo_mean,
+            title = "% Cobertura de filódios",
+            opacity = 0.3, group="% Cobertura filódios") %>% 
+  addLegend(position = "bottomleft", pal = conpal_flow, values = with_galls_m$perc_flow_mean,
+            title = "% Cobertura de flores",
+            opacity = 0.3, group="% Cobertura flores") %>% 
+  addLegend(position = "bottomleft", pal = conpal_pods, values = with_galls_m$perc_pods_mean,
+            title = "% Cobertura de vagens",
+            opacity = 0.3, group="% Cobertura vagens") %>% 
+  addLegend(position = "bottomleft", pal = dispal_galls, values = with_galls_m$Perc_galls_cat,
+            title = "Classe % Cobertura galhas",
+            opacity = 0.3, group="Classe % Cobertura galhas") %>%
+  addLegend(position = "bottomleft", pal = dispal_phylo, values = with_galls_m$Perc_phylo_cat,
+            title = "Classe % Cobertura filódios",
+            opacity = 0.3, group="Classe % Cobertura filódios") %>%
+  addLegend(position = "bottomleft", pal = dispal_flow, values = with_galls_m$Perc_flow_cat,
+            title = "Classe % Cobertura flores",
+            opacity = 0.3, group="Classe % Cobertura flores") %>%
+  addLegend(position = "bottomleft", pal = dispal_pods, values = with_galls_m$Perc_pods_cat,
+            title = "Classe % Cobertura vagens",
+            opacity = 0.3, group="Classe % Cobertura vagens") %>%
+  hideGroup(c("Galhas detectadas", "Galhas não detectadas", "Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens")) %>% 
   
   addEasyButton(easyButton(
     icon="fa-globe", title="Zoom to Level 10",
@@ -369,5 +438,5 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
              localization = "pt_PT")
 #Printing and exporting the map
 m  
-saveWidget(m, file = ".\\Monit_Trichi_2023\\Mapas\\mapa_pres_aus_leaflet.html")
+saveWidget(m, file = ".\\Monit_Trichi_2023\\Mapas\\mapa_perc_leaflet.html")
 
