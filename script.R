@@ -208,18 +208,21 @@ Pl_wTrichi_grids1 <- Pl_wTrichi_grids %>%
 with_galls_grids1 <- with_galls_grids %>%
   st_transform(crs = 4326)
 
+st_write(grid_pt1, dsn=paste0(out.dir, "grid_ptwgs84",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+st_write(grid_pt301, dsn=paste0(out.dir, "grid_pt30wgs84",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+st_write(with_galls_grids1, dsn=paste0(out.dir, "presencewgs84",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+st_write(without_galls_grids1, dsn=paste0(out.dir, "absencewgs84",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+st_write(Pl_not_visited_grids1, dsn=paste0(out.dir, "pl_not_visitedwgs84",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+st_write(Pl_wTrichi_grids1, dsn=paste0(out.dir, "pl_withtrichiwgs84",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
+
+
 #Creating the map
 m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas = TRUE) ) %>%
   addProviderTiles("OpenStreetMap", group="Open Street Map") %>% 
   addProviderTiles("Esri.WorldImagery", group="Satellite") %>%
   setView(-7.121931, 39.909736, zoom = 6) %>%
   
-  addPolygons(data = grid_pt1, 
-              color = "grey", fillColor = NULL, fillOpacity = 0, dashArray = "3",
-              group = "Grelha UTM10x10km") %>%
-  addPolygons(data = grid_pt301, 
-              color = "white", fillColor = NULL, fillOpacity = 0, dashArray = "3",
-              group = "Grelha 30km UTM10x10km") %>%
+
   addPolygons(data = without_galls_grids1, 
               color = "red", fillColor = "red", fillOpacity = 0.4,dashArray = "3",
               group = "Galhas não detectadas") %>%
@@ -232,6 +235,12 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
   addPolygons(data = with_galls_grids1, 
               color = "green", fillColor = "green", fillOpacity = 0.4,dashArray = "3",
               group = "Galhas detectadas") %>%
+  addPolygons(data = grid_pt1, 
+              color = "grey", fillColor = NULL, fillOpacity = 0, dashArray = "3",
+              group = "Grelha UTM10x10km") %>%
+  addPolygons(data = grid_pt301, 
+              color = "darkblue", fillColor = NULL, fillOpacity = 0, dashArray = "3",
+              group = "Grelha 30km UTM10x10km") %>%
   
   addLayersControl(
     baseGroups = c("Open Street Map", "Satellite"),
@@ -326,12 +335,10 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
   addProviderTiles("OpenStreetMap", group="Open Street Map") %>% 
   addProviderTiles("Esri.WorldImagery", group="Satellite") %>%
   setView(-7.121931, 39.909736, zoom = 6) %>%
-  addPolygons(data = grid_pt1, 
-              color = "grey", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
-              group = "Grelha UTM10x10km") %>%
-  addPolygons(data = grid_pt301, 
-              color = "white", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
-              group = "Grelha 30km UTM10x10km") %>%
+  
+  addPolygons(data = with_galls_m_grids1, 
+              color = "green", fillColor = "green", fillOpacity = 0.4,dashArray = "3",
+              group = "Galhas detectadas") %>%
   addPolygons(data = without_galls_grids1, 
               color = "red", fillColor = "red", fillOpacity = 0.4,dashArray = "3",
               group = "Galhas não detectadas") %>%
@@ -398,15 +405,19 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
                             "% Cobertura vagens: ", with_galls_m$perc_pods_mean, "\u00b1", round(with_galls_m$error.perc_pods, 1), "SME", "<br>"),
               fillOpacity = 0.9,dashArray = "3",
               group = "% Cobertura vagens") %>%
-  addPolygons(data = with_galls_m_grids1, 
-              color = "green", fillColor = "green", fillOpacity = 0.4,dashArray = "3",
-              group = "Galhas detectadas") %>%
+  addPolygons(data = grid_pt1, 
+              color = "grey", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
+              group = "Grelha UTM10x10km") %>%
+  addPolygons(data = grid_pt301, 
+              color = "darkblue", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
+              group = "Grelha 30km UTM10x10km") %>%
+
   
   addLayersControl(
     baseGroups = c("Open Street Map", "Satellite"),
     #overlayGroups = c("marcadores", "clusteres", "Freguesias com Presença", "Freguesias com Libertação"),
     #overlayGroups = c("Censo", "Áreas Protegidas"),
-    overlayGroups = c("Grelha UTM10x10km", "Grelha 30km UTM10x10km", "Galhas detectadas", "Galhas não detectadas","Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura galhas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens"),
+    overlayGroups = c("Galhas detectadas", "Galhas não detectadas","Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura galhas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens", "Grelha UTM10x10km", "Grelha 30km UTM10x10km"),
     options = layersControlOptions(collapsed = FALSE)) %>% 
   
   addLegend(position = "bottomleft", pal = conpal_galls, values = with_galls_m$perc_galls_mean,
