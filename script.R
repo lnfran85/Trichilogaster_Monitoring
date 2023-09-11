@@ -87,7 +87,7 @@ db2<- read.csv(".\\Lugares_no_visit_sin_pres_previa_trichi.csv", header = T, enc
   st_join(grid_pt)  
 
 
-save(db, db1, db2, grid_pt, file = "datasets_monitoring_2023.rds")
+save(db, db1, db2, grid_pt, grid_pt30, file = "datasets_monitoring_2023.rds")
 
 
 #CREATING MAPS ----
@@ -192,6 +192,9 @@ without_galls_grids <- only_abs
 #Projecting data sets to WGS84 from ETRS89 / Portugal TM06
 grid_pt1 <- grid_pt %>%
   st_transform(crs = 4326)
+grid_pt301 <- grid_pt30 %>%
+  st_transform(crs = 4326)
+
 
 without_galls_grids1 <- without_galls_grids %>%
   st_transform(crs = 4326)
@@ -212,8 +215,11 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
   setView(-7.121931, 39.909736, zoom = 6) %>%
   
   addPolygons(data = grid_pt1, 
-              color = "white", fillColor = NULL, fillOpacity = 0, dashArray = "3",
+              color = "grey", fillColor = NULL, fillOpacity = 0, dashArray = "3",
               group = "Grelha UTM10x10km") %>%
+  addPolygons(data = grid_pt301, 
+              color = "white", fillColor = NULL, fillOpacity = 0, dashArray = "3",
+              group = "Grelha 30km UTM10x10km") %>%
   addPolygons(data = without_galls_grids1, 
               color = "red", fillColor = "red", fillOpacity = 0.4,dashArray = "3",
               group = "Galhas não detectadas") %>%
@@ -231,7 +237,7 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
     baseGroups = c("Open Street Map", "Satellite"),
     #overlayGroups = c("marcadores", "clusteres", "Freguesias com Presença", "Freguesias com Libertação"),
     #overlayGroups = c("Censo", "Áreas Protegidas"),
-    overlayGroups = c("Grelha UTM10x10km", "Galhas detectadas", "Galhas não detectadas", "Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas"),
+    overlayGroups = c("Grelha UTM10x10km","Grelha 30km, UTM10x10km", "Galhas detectadas", "Galhas não detectadas", "Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas"),
     options = layersControlOptions(collapsed = FALSE)) %>% 
 
   addEasyButton(easyButton(
@@ -321,8 +327,11 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
   addProviderTiles("Esri.WorldImagery", group="Satellite") %>%
   setView(-7.121931, 39.909736, zoom = 6) %>%
   addPolygons(data = grid_pt1, 
-              color = "white", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
+              color = "grey", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
               group = "Grelha UTM10x10km") %>%
+  addPolygons(data = grid_pt301, 
+              color = "white", fillColor = NULL, fillOpacity = 0.3, dashArray = "3",
+              group = "Grelha 30km UTM10x10km") %>%
   addPolygons(data = without_galls_grids1, 
               color = "red", fillColor = "red", fillOpacity = 0.4,dashArray = "3",
               group = "Galhas não detectadas") %>%
@@ -397,7 +406,7 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
     baseGroups = c("Open Street Map", "Satellite"),
     #overlayGroups = c("marcadores", "clusteres", "Freguesias com Presença", "Freguesias com Libertação"),
     #overlayGroups = c("Censo", "Áreas Protegidas"),
-    overlayGroups = c("Grelha UTM10x10km", "Galhas detectadas", "Galhas não detectadas","Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura galhas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens"),
+    overlayGroups = c("Grelha UTM10x10km", "Grelha 30km UTM10x10km", "Galhas detectadas", "Galhas não detectadas","Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura galhas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens"),
     options = layersControlOptions(collapsed = FALSE)) %>% 
   
   addLegend(position = "bottomleft", pal = conpal_galls, values = with_galls_m$perc_galls_mean,
@@ -424,7 +433,7 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
   addLegend(position = "bottomleft", pal = dispal_pods, values = with_galls_m$Perc_pods_cat,
             title = "Classe % Cobertura vagens",
             opacity = 0.3, group="Classe % Cobertura vagens") %>%
-  hideGroup(c("Galhas detectadas", "Galhas não detectadas", "Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens")) %>% 
+  hideGroup(c("Grelha 30km UTM10x10km", "Galhas detectadas", "Galhas não detectadas", "Quadrículas com Trichilogaster não visitadas", "Quadrículas com acácia não visitadas", "Classe % Cobertura filódios", "Classe % Cobertura flores", "Classe % Cobertura vagens", "% Cobertura galhas", "% Cobertura filódios", "% Cobertura flores", "% Cobertura vagens")) %>% 
   
   addEasyButton(easyButton(
     icon="fa-globe", title="Zoom to Level 10",
