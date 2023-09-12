@@ -6,6 +6,7 @@ library(tidyverse)
 library(xlsx)
 library(leaflet)
 library(htmlwidgets)
+library(smplot2)
 
 #Defining paths
 out.dir <- (".\\Monit_Trichi_2023\\Mapas\\")
@@ -136,20 +137,6 @@ plot(st_geometry(grid_pt[db2, ]))
 #Exporting to shapefile
 st_write(Pl_not_visited_grids, dsn = paste0(out.dir, "Places_WithoutVis",".shp"),driver = "ESRI Shapefile") #Saving on shapefile
 
-###################
-###################
-#Filtering and counting the number of cells sampled in the first 30km from the coastline
-overlaped <- intersect(with_galls_grids,without_galls_grids) #solapadas
-only_pres <- setdiff(with_galls_grids,without_galls_grids) #solo pres
-only_abs <- setdiff(without_galls_grids,with_galls_grids) #solo aus
-
-with_trichi <- rbind(overlaped, only_pres)
-without_trichi <- only_abs
-
-with_trichi_grids30<- grid_pt30[with_trichi,] 
-plot(st_geometry(grid_pt30[with_trichi,] ))
-###################
-###################
 
 #Plotting map (simple)
 ggplot() + 
@@ -460,3 +447,63 @@ m <- leaflet(options = leafletOptions(minZoom = 6, maxZoom = 18 , preferCanvas =
 m  
 saveWidget(m, file = ".\\Monit_Trichi_2023\\Mapas\\mapa_perc_leaflet.html")
 
+
+## Correlations
+
+with_galls_m$
+
+ggplot(data=with_galls_m, aes(perc_galls_mean, perc_pods_mean))+
+  geom_point(size=4, color="grey")+
+  #geom_smooth(data=with_galls_m, mapping = aes(perc_galls_mean, perc_pods_mean))+
+  sm_statCorr(color = '#0f993d', corr_method = 'spearman',size=2,
+              linetype = 'dashed')+
+  xlab("% médio de cobertura de galhas") +
+  ylab("% médio de cobertura de vagens") +
+  ylim(c(0,100))+
+  theme(panel.grid.major = element_line(colour = "transparent"),
+        axis.line = element_line(),
+        panel.border=element_blank(),
+        panel.background = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "italic", size = 14)) 
+cor.test(with_galls_m$perc_galls_mean, with_galls_m$perc_pods_mean)
+
+ggplot(data=with_galls_m, aes(perc_galls_mean, perc_phylo_mean))+
+  geom_point(size=4, color="grey")+
+  #geom_smooth(data=with_galls_m, mapping = aes(perc_galls_mean, perc_pods_mean))+
+  sm_statCorr(color = '#0f993d', corr_method = 'spearman',size=2,
+              linetype = 'dashed')+
+  xlab("% médio de cobertura de galhas") +
+  ylab("% médio de cobertura de filódios") +
+  ylim(c(0,100))+
+  theme(panel.grid.major = element_line(colour = "transparent"),
+        axis.line = element_line(),
+        panel.border=element_blank(),
+        panel.background = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "italic", size = 14)) 
+cor.test(with_galls_m$perc_galls_mean, with_galls_m$perc_phylo_mean)
+
+ggplot(data=with_galls_m, aes(perc_galls_mean, perc_flow_mean))+
+  geom_point(size=4, color="grey")+
+  #geom_smooth(data=with_galls_m, mapping = aes(perc_galls_mean, perc_pods_mean))+
+  sm_statCorr(color = '#0f993d', corr_method = 'spearman',size=2,
+              linetype = 'dashed')+
+  xlab("% médio de cobertura de galhas") +
+  ylab("% médio de cobertura de inflorescências") +
+  ylim(c(0,100))+
+  theme(panel.grid.major = element_line(colour = "transparent"),
+        axis.line = element_line(),
+        panel.border=element_blank(),
+        panel.background = element_blank(),
+        plot.title = element_text(hjust = 0.5, face = "italic", size = 14)) 
+cor.test(with_galls_m$perc_galls_mean, with_galls_m$perc_flow_mean)
+
+#DIRECT NO-TARGET EFFECTS ----
+without_galls_m <- db %>%
+  filter(Species != "Acacia longifolia") 
+without_galls_m$Species <- droplevels(without_galls_m$Species)
+
+
+tt1 <-count(without_galls_m, Species)
+tt1 <- as.data.frame(tt1)
+tt1 <- tt1[,c(1:2)]
+write.csv2(as.data.frame(tt1), "species_nao_alvo.csv")
