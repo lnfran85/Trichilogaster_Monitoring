@@ -1,3 +1,4 @@
-# Trichilogaster_Monitoring
+Este repositório contém os datasets, script e outputs resultantes da monitorização de <i>Trichilogaster acaciaelongifoliae</i> em Portugal em 2023. 
 
-Para calcular as medias dos intervalos https://www.displayr.com/how-to-calculate-an-average-value-from-categorical-data/
+
+
